@@ -1,0 +1,4 @@
+build/
+nose-*.egg/
+*.pyo
+*.pyc
