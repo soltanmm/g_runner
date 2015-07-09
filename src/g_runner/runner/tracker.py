@@ -6,6 +6,7 @@ interfaces.Path.register(list)
 interfaces.Path.register(tuple)
 interfaces.Path.register(str)
 
+
 class Tracker(interfaces.Tracker):
   """A tracker implementation tailored for the internals of the runner."""
 
