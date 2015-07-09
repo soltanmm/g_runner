@@ -18,6 +18,7 @@ class Path(object):
 
   @abc.abstractmethod
   def __hash__(self):
+    """Hash of the path, not the object the path is referring to!"""
     raise NotImplementedError()
 
   @abc.abstractmethod
