@@ -7,4 +7,5 @@ PathState = _event.PathState
 EventFlags = _event.EventFlags
 Event = _event.Event
 
+RunnerError = _run.RunnerError
 run_tracker = _run.run_tracker

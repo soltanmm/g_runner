@@ -10,15 +10,24 @@ from g_runner.runner import _event
 from g_runner.runner import tracker as _tracker
 
 
+class RunnerError(Exception):
+
+  def __init__(self, exceptions_iterable):
+    super(RunnerError, self).__init__('Some exception(s) were raised')
+    self.exceptions = list(exceptions_iterable)
+
+
 class _PathState(_event.PathState):
   """State of a path during a run.
 
   Extends _event.PathState with an intermediary state `updating`, representing a
   path that is being output by some running task, and `updated`, representing a
   path that has finished being output and is a candidate for being considered
-  `up_to_date`."""
+  `up_to_date`. `poisoned` means that it's `outdated` and we cannot bring it
+  `up_to_date` (e.g. because the task to bring it up to date failed)."""
   updating = 'updating'
   updated = 'updated'
+  poisoned = 'poisoned'
 
 
 class _TaskState(object):
@@ -70,7 +79,8 @@ def _run_tracker_poll_event_iterator(event_iterator, out_event_deque):
 
 class _TrackerRunner(object):
 
-  def __init__(self, tracker, outdated=True, callbacks=RunnerCallbacks()):
+  def __init__(self, tracker, outdated=True, callbacks=RunnerCallbacks(),
+               keep_going=False):
     if not isinstance(tracker, interfaces.Tracker):
       raise TypeError('expected `tracker` to be an `interfaces.Tracker`')
     if not isinstance(callbacks, RunnerCallbacks):
@@ -83,6 +93,7 @@ class _TrackerRunner(object):
           _PathState.outdated: set(tracker.paths()),
           _PathState.updating: set(),
           _PathState.up_to_date: set(),
+          _PathState.poisoned: set()
       }
     else:
       self.path_states = dict(
@@ -101,6 +112,8 @@ class _TrackerRunner(object):
     }
     self.task_generated_events = {}
     self.callbacks = callbacks
+    self.keep_going = keep_going
+    self.failures_deque = []
     self.lock = threading.RLock()
 
   def _remove_path(self, path):
@@ -228,15 +241,29 @@ class _TrackerRunner(object):
   def _run_task_handle_updated_event(self, task, event_deque):
     with self.lock:
       self._set_task_state(task, _TaskState.running)
-    task.run()
-    # the deque structure is lock-free! woo!
-    event_deque.append(
-        _event.Event(
-            path_selector=lambda ignored_tracker: task.output_paths(),
-            flags=_event.EventFlags(
-                hint_local=True,
-                paths_state=_PathState.updated)
-        ))
+    successful = False
+    try:
+      task.run()
+      successful = True
+    except Exception as e:
+      self.failures_deque.append(e)
+    # the deque structure doesn't need locking! woo!
+    if successful:
+      event_deque.append(
+          _event.Event(
+              path_selector=lambda ignored_tracker: task.output_paths(),
+              flags=_event.EventFlags(
+                  hint_local=True,
+                  paths_state=_PathState.updated)
+          ))
+    else:
+      event_deque.append(
+          _event.Event(
+              path_selector=lambda ignored_tracker: task.output_paths(),
+              flags=_event.EventFlags(
+                  hint_local=True,
+                  paths_state=_PathState.poisoned)
+          ))
     with self.lock:
       if self.task_states[task] == _TaskState.zombie:
         self._remove_task(task)
@@ -276,8 +303,8 @@ class _TrackerRunner(object):
   def _up_to_date(self):
     return reduce(
         lambda a, b: a and b,
-        (state == _PathState.up_to_date for state in self.path_states.values()),
-        True)
+        (state == _PathState.up_to_date or state == _PathState.poisoned
+         for state in self.path_states.values()), True)
 
   def run(self, runner_event_iterator):
     """Run the passed tracker.
@@ -302,6 +329,8 @@ class _TrackerRunner(object):
 
     while (runner_event_poll_thread.is_alive() or len(runner_events) > 0 or
            not self._up_to_date()):
+      if len(self.failures_deque) > 0 and not self.keep_going:
+        raise RunnerError(self.failures_deque)
       # Pump the queue
       while True:
         try:
@@ -315,6 +344,12 @@ class _TrackerRunner(object):
       # only for cycle-inducing tasks).
       self._run_update(runner_event_deque)
 
+    if len(self.failures_deque) > 0:
+      raise RunnerError(self.failures_deque)
 
-def run_tracker(tracker, runner_event_iterator, outdated=True):
-  _TrackerRunner(tracker, outdated=outdated).run(runner_event_iterator)
+
+def run_tracker(tracker, runner_event_iterator,
+                outdated=True, keep_going=False):
+  tracker_runner = _TrackerRunner(
+      tracker, outdated=outdated, keep_going=keep_going)
+  return tracker_runner.run(runner_event_iterator)

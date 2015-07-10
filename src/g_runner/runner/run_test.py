@@ -44,6 +44,16 @@ class TestTask(interfaces.Task):
                     copy.deepcopy(self.outputs, memo))
 
 
+class FailingTestTask(TestTask):
+
+  def __init__(self, task_name, inputs, outputs, error):
+    super(FailingTestTask, self).__init__(task_name, inputs, outputs)
+    self.error = error
+
+  def run(self):
+    raise self.error
+
+
 class RunnerTest(unittest.TestCase):
 
   def test_line_run(self):
@@ -110,6 +120,32 @@ class RunnerTest(unittest.TestCase):
     self.assertLessEqual(task0.run_time, task13.run_time)
     self.assertLessEqual(task13.run_time, task234.run_time)
     self.assertLessEqual(task12.run_time, task234.run_time)
+
+  def test_failure(self):
+    tracker = _tracker.Tracker().replaced(
+        new_paths=[(1,)],
+        new_tasks=[
+            FailingTestTask('', [], [(1,)], RuntimeError('foo'))
+        ]
+    )
+    with self.assertRaises(runner.RunnerError):
+      runner.run_tracker(tracker, iter([]))
+
+  def test_failure_keep_going(self):
+    task2 = TestTask('2', [], [(2,)])
+    task23 = TestTask('23', [(2,)], [(3,)])
+    tracker = _tracker.Tracker().replaced(
+        new_paths=[(1,), (2,), (3,)],
+        new_tasks=[
+            FailingTestTask('', [], [(1,)], RuntimeError('foo')),
+            task2,
+            task23
+        ]
+    )
+    with self.assertRaises(runner.RunnerError):
+      runner.run_tracker(tracker, iter([]), keep_going=True)
+    self.assertEqual(1, task2.ran_count)
+    self.assertEqual(1, task23.ran_count)
 
 if __name__ == '__main__':
   unittest.main(verbosity=2)
