@@ -88,46 +88,31 @@ class Tracker(interfaces.Tracker):
   def paths(self):
     return self._paths
 
-  def add_path(self, path):
-    self._paths.add(path)
-    if path not in self._tasks_by_inputs:
-      self._tasks_by_inputs[path] = set()
-    if path not in self._tasks_by_outputs:
-      self._tasks_by_outputs[path] = set()
-
-  def remove_path(self, path):
-    self._paths.remove(path)
-    if path in self._tasks_by_inputs:
-      del self._tasks_by_inputs[path]
-    if path in self._tasks_by_outputs:
-      del self._tasks_by_outputs[path]
-
-  def add_task(self, task):
-    self._tasks.add(task)
-    for path in task.input_paths():
-      self._tasks_by_inputs[path].add(task)
-    for path in task.output_paths():
-      self._tasks_by_outputs[path].add(task)
-
-  def remove_task(self, task):
-    self._tasks.remove(task)
-    for path in task.input_paths():
-      self._tasks_by_inputs[path].remove(task)
-    for path in task.output_paths():
-      self._tasks_by_outputs[path].remove(task)
-    for (tag, tasks) in self._tasks_by_tags.items():
-      tasks.remove(task)
-
-  def add_task_tag(self, task, tag):
-    if tag is None:
-      return
-    self._tasks_by_tags[tag].add(task)
-
-  def clear_task_tags(self, task):
-    if tag is None:
-      return
-    for (tag, tasks) in self._tasks_by_tags.items():
-      tasks.remove(task)
+  def replaced(self, old_paths=set(), new_paths=set(),
+               old_tasks=set(), new_tasks=set(), new_tagged_tasks=dict()):
+    new_tracker = Tracker()
+    new_tracker._paths = (
+        self._paths.difference(set(old_paths)).union(set(new_paths)))
+    new_tracker._tasks = (
+        self._tasks.difference(set(old_tasks)).union(set(new_tasks).union(
+            set(new_tagged_tasks.keys()))))
+    new_tracker._tasks_by_tags = {}
+    for (tag, tasks) in self._tasks_by_tags:
+      taskset = set(task for task in tasks if task not in old_tasks)
+      if len(taskset) > 0:
+        new_tracker._tasks_by_tags[tag] = taskset
+    for (task, tags) in new_tagged_tasks.items():
+      for tag in tags:
+        new_tracker._tasks_by_tags.setdefault(tag, set()).add(task)
+    new_tracker._tasks_by_inputs = dict(
+        (path, set(task for task in new_tracker._tasks
+                   if path in list(task.input_paths())))
+        for path in new_tracker._paths)
+    new_tracker._tasks_by_outputs = dict(
+        (path, set(task for task in new_tracker._tasks
+                   if path in list(task.output_paths())))
+        for path in new_tracker._paths)
+    return new_tracker
 
   def __eq__(self, other):
     return self._paths == other._paths and self._tasks == other._tasks

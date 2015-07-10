@@ -14,6 +14,7 @@ class EventFlags(
               'hint_local',
               'paths_state',
               'tasks_tags',
+              'removed_tasks_outdate_paths',
           ])):
   """Flags for individual events.
 
@@ -28,11 +29,15 @@ class EventFlags(
       (should normally come from `PathState`).
     tasks_tags (list): what tags the tasks selected/regenerated have; if None,
       no tag changes are applied.
+    removed_tasks_outdate_paths (bool): tasks that are removed and cause their
+      output paths to be outdated.
   """
   def __new__(cls, hint_local=False, paths_state=PathState.up_to_date,
-              tasks_tags=None):
-    return super(EventFlags, cls).__new__(cls, hint_local, paths_state,
-                                          tasks_tags)
+              tasks_tags=None, removed_tasks_outdate_paths=False):
+    return super(EventFlags, cls).__new__(
+        cls, hint_local=hint_local, paths_state=paths_state,
+        tasks_tags=tasks_tags,
+        removed_tasks_outdate_paths=removed_tasks_outdate_paths)
 
 
 class Event(

@@ -105,13 +105,13 @@ class _TrackerRunner(object):
 
   def _remove_path(self, path):
     with self.lock:
-      self.tracker.remove_path(path)
+      self.tracker = self.tracker.replaced(old_paths=[path])
       self.paths_by_state[self.path_states[path]].remove(path)
       del self.path_states[path]
 
   def _add_path(self, path, state):
     with self.lock:
-      self.tracker.add_path(path)
+      self.tracker = self.tracker.replaced(new_paths=[path])
       self.paths_by_state[state].add(path)
       self.path_states[path] = state
     self.callbacks.on_path_added(path)
@@ -133,13 +133,13 @@ class _TrackerRunner(object):
         # don't need to do anything
         pass
       else:
-        self.tracker.remove_task(task)
+        self.tracker = self.tracker.replaced(old_tasks=[task])
         self.tasks_by_state[self.task_states[task]].remove(task)
         del self.task_states[task]
 
   def _add_task(self, task):
     with self.lock:
-      self.tracker.add_task(task)
+      self.tracker = self.tracker.replaced(new_tasks=[tasks])
       self.task_states[task] = _TaskState.stopped
       self.tasks_by_state[_TaskState.stopped].add(task)
 
@@ -165,14 +165,11 @@ class _TrackerRunner(object):
     elif state == _TaskState.running:
       self.callbacks.on_task_running(task)
 
-  def _clear_task_tags(self, task):
+  def _replace_task_tags(self, task, tags):
     with self.lock:
-      self.tracker.clear_task_tags(task)
-
-  def _add_task_tag(self, task, tags):
-    with self.lock:
-      for tag in tags:
-        self.tracker.add_task_tag(task, tag)
+      self.tracker = self.tracker.replaced(
+          old_tasks=[task],
+          new_tagged_tasks={task:tags})
 
   def _handle_events(self, events):
     """Applies the events.
@@ -217,13 +214,15 @@ class _TrackerRunner(object):
           new_new_tasks = new_tasks.difference(tasks)
           for task in removed_tasks:
             self._remove_task(task)
+            if event.flags.removed_tasks_outdate_paths:
+              for path in task.output_paths():
+                self._set_path_state(path, _PathState.outdated)
           for task in new_new_tasks:
             self._add_task(task)
           tasks = new_tasks
         if event.tasks_tags is not None:
           for task in tasks:
-            self._clear_task_tags(task)
-            self._add_task_tags(task, event.flags.tasks_tags)
+            self._replace_task_tags(task, event.flags.tasks_tags)
     return []
 
   def _run_task_handle_updated_event(self, task, event_deque):

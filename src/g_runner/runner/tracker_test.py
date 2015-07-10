@@ -47,17 +47,32 @@ class TrackerTest(unittest.TestCase):
     tracker = _tracker.Tracker()
 
   def test_tracker_updates(self):
-    tracker = _tracker.Tracker()
-    tracker.add_path((1,))
-    tracker.add_path((2,))
-    tracker.add_path((3,))
+    tracker = _tracker.Tracker().replaced(
+      new_paths=[(1,), (2,), (3,)],
+      new_tasks=[
+          TestTask('12', [(1,)], [(2,)]),
+          TestTask('23', [(2,)], [(3,)])
+      ]
+    )
     self.assertEqual(3, len(tracker.paths()))
-    tracker.add_task(TestTask('12', [(1,)], [(2,)]))
-    tracker.add_task(TestTask('23', [(2,)], [(3,)]))
     self.assertEqual(2, len(tracker.tasks()))
     self.assertEqual(1, len(tracker.tasks_by_inputs([(1,)])))
     self.assertEqual(1, len(tracker.tasks_by_inputs([(2,)])))
     self.assertEqual(0, len(tracker.tasks_by_inputs([(1,), (2,)])))
+
+  def test_tracker_tags(self):
+    tracker = _tracker.Tracker().replaced(
+      new_paths=[(1,), (2,), (3,)],
+      new_tagged_tasks={
+          TestTask('12', [(1,)], [(2,)]): ['tag1', 'tag2', 'tag3'],
+          TestTask('23', [(2,)], [(3,)]): ['tag2'],
+          TestTask('13', [(1,)], [(3,)]): ['tag1']
+      }
+    )
+    self.assertEqual(2, len(tracker.tasks_by_tags(['tag1'])))
+    self.assertEqual(2, len(tracker.tasks_by_tags(['tag2'])))
+    self.assertEqual(1, len(tracker.tasks_by_tags(['tag3'])))
+    self.assertEqual(1, len(tracker.tasks_by_tags(['tag1', 'tag2'])))
 
 if __name__ == '__main__':
   unittest.main(verbosity=2)

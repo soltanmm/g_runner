@@ -47,14 +47,15 @@ class TestTask(interfaces.Task):
 class RunnerTest(unittest.TestCase):
 
   def test_line_run(self):
-    tracker = _tracker.Tracker()
-    tracker.add_path((1,))
-    tracker.add_path((2,))
-    tracker.add_path((3,))
     task12 = TestTask('12', [(1,)], [(2,)])
     task23 = TestTask('23', [(2,)], [(3,)])
-    tracker.add_task(task12)
-    tracker.add_task(task23)
+    tracker = _tracker.Tracker().replaced(
+      new_paths=[(1,), (2,), (3,)],
+      new_tasks=[
+          task12,
+          task23
+      ]
+    )
     runner.run_tracker(tracker, iter([
         runner.Event(
             path_selector=lambda unused_tracker: [(1,)],
@@ -68,16 +69,17 @@ class RunnerTest(unittest.TestCase):
     self.assertLessEqual(task12.run_time, task23.run_time)
 
   def test_line_run_initializing_task(self):
-    tracker = _tracker.Tracker()
-    tracker.add_path((1,))
-    tracker.add_path((2,))
-    tracker.add_path((3,))
     task0 = TestTask('0', [], [(1,)])
     task12 = TestTask('12', [(1,)], [(2,)])
     task23 = TestTask('23', [(2,)], [(3,)])
-    tracker.add_task(task0)
-    tracker.add_task(task12)
-    tracker.add_task(task23)
+    tracker = _tracker.Tracker().replaced(
+      new_paths=[(1,), (2,), (3,)],
+      new_tasks=[
+          task0,
+          task12,
+          task23
+      ]
+    )
     runner.run_tracker(tracker, iter([]))
     self.assertEqual(1, task0.ran_count)
     self.assertEqual(1, task12.ran_count)
@@ -86,19 +88,19 @@ class RunnerTest(unittest.TestCase):
     self.assertLessEqual(task12.run_time, task23.run_time)
 
   def test_join_initializing_task(self):
-    tracker = _tracker.Tracker()
-    tracker.add_path((4,))
-    tracker.add_path((3,))
-    tracker.add_path((2,))
-    tracker.add_path((1,))
     task0 = TestTask('0', [], [(1,)])
     task12 = TestTask('12', [(1,)], [(2,)])
     task13 = TestTask('13', [(1,)], [(3,)])
     task234 = TestTask('234', [(2,), (3,)], [(4,)])
-    tracker.add_task(task0)
-    tracker.add_task(task12)
-    tracker.add_task(task13)
-    tracker.add_task(task234)
+    tracker = _tracker.Tracker().replaced(
+        new_paths=[(4,), (3,), (2,), (1,)],
+        new_tasks=[
+            task0,
+            task12,
+            task13,
+            task234
+        ]
+    )
     runner.run_tracker(tracker, iter([]))
     self.assertEqual(1, task0.ran_count)
     self.assertEqual(1, task12.ran_count)

@@ -42,6 +42,28 @@ class Tracker(object):
     raise NotImplementedError()
 
   @abc.abstractmethod
+  def replaced(self, old_paths=None, new_paths=None,
+               old_tasks=None, new_tasks=None, new_tagged_tasks=None):
+    """Get a new tracker with old items replaced with new items.
+
+    Arguments:
+      old_paths (iterable): an iterable of paths to be replaced. If unspecified,
+        new_paths are simply added.
+      new_paths (iterable): an iterable of paths to replace the old_paths with.
+        If unspecified, the old_paths are simply removed. If both are
+        unspecified, there will be no relative difference between the new
+        tracker and self with respect to paths.
+      old_tasks (iterable): an iterable of paths to be replaced. If unspecified,
+        new_tasks are simply added.
+      new_tasks (iterable): an iterable of tasks to replace the old_tasks with.
+        If unspecified and new_tagged_tasks is unspecified, the old_tasks are
+        simply removed.  If all are unspecified, there will be no relative
+        difference between the new tracker and self with respect to tasks.
+      new_tagged_tasks (iterable): an iterable of 2-sequences of tasks and
+        sequences of tags. Is aggregated with new_tasks for task replacement."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
   def __eq__(self, other):
     """Get equivalence between trackers.
 
