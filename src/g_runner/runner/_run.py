@@ -42,7 +42,9 @@ class _TaskState(object):
 class RunnerCallbacks(object):
   """Callbacks during a run of tracked tasks.
 
-  Useful for verbose output of the run state."""
+  Useful for verbose output of the run state. Note that callbacks have no
+  explicit locking from the runner, thus thread safety must be ensured by the
+  callee."""
 
   def on_task_running(self, task):
     """Called when a task enters the running state."""
@@ -50,6 +52,13 @@ class RunnerCallbacks(object):
 
   def on_task_stopped(self, task):
     """Called when a task enters the stopped state."""
+    pass
+
+  def on_task_failed(self, task):
+    """Called when a task failed.
+
+    Note that this is a refinement of a task stopping; it is called in addition
+    to on_task_stopped."""
     pass
 
   def on_path_added(self, path):
@@ -246,6 +255,7 @@ class _TrackerRunner(object):
       task.run()
       successful = True
     except Exception as e:
+      self.callbacks.on_task_failed(task)
       self.failures_deque.append(e)
     # the deque structure doesn't need locking! woo!
     if successful:
