@@ -45,6 +45,7 @@ class TrackerTest(unittest.TestCase):
     self.assertIsInstance(['a', 1], interfaces.Path)
     self.assertIsInstance((3,), interfaces.Path)
     tracker = _tracker.Tracker()
+    self.assertTrue(_tracker.is_tracker_valid(tracker))
 
   def test_tracker_updates(self):
     tracker = _tracker.Tracker().replaced(
@@ -59,6 +60,7 @@ class TrackerTest(unittest.TestCase):
     self.assertEqual(1, len(tracker.tasks_by_inputs([(1,)])))
     self.assertEqual(1, len(tracker.tasks_by_inputs([(2,)])))
     self.assertEqual(0, len(tracker.tasks_by_inputs([(1,), (2,)])))
+    self.assertTrue(_tracker.is_tracker_valid(tracker))
 
   def test_tracker_tags(self):
     tracker = _tracker.Tracker().replaced(
@@ -73,6 +75,7 @@ class TrackerTest(unittest.TestCase):
     self.assertEqual(2, len(tracker.tasks_by_tags(['tag2'])))
     self.assertEqual(1, len(tracker.tasks_by_tags(['tag3'])))
     self.assertEqual(1, len(tracker.tasks_by_tags(['tag1', 'tag2'])))
+    self.assertTrue(_tracker.is_tracker_valid(tracker))
 
 if __name__ == '__main__':
   unittest.main(verbosity=2)

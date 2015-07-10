@@ -1,4 +1,5 @@
 import copy
+import itertools
 
 from g_runner import interfaces
 
@@ -6,12 +7,25 @@ interfaces.Path.register(list)
 interfaces.Path.register(tuple)
 interfaces.Path.register(str)
 
+def is_tracker_valid(tracker):
+  return len(set(tracker.paths())) == len(tracker.paths()) and reduce(
+          lambda a, b: a and b,
+          [path in tracker.paths()
+           for task in tracker.tasks()
+           for path in itertools.chain(task.input_paths(),
+                                       task.output_paths())],
+          True)
+
 
 class Tracker(interfaces.Tracker):
   """A tracker implementation tailored for the internals of the runner."""
 
   def __init__(self, original_tracker=None, deepcopy_memo=None):
     if original_tracker is not None:
+      if not isinstance(original_tracker, interfaces.Tracker):
+        raise TypeError('expected tracker to be `interfaces.Tracker`')
+      if not is_tracker_valid(original_tracker):
+        raise ValueError('expected a valid tracker')
       if deepcopy_memo:
         self._paths = set(copy.deepcopy(path, deepcopy_memo)
                           for path in original_tracker.paths())
@@ -125,4 +139,5 @@ class Tracker(interfaces.Tracker):
 
   def __deepcopy__(self, memo):
     return Tracker(self, deepcopy_memo=memo)
+
 
