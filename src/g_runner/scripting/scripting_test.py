@@ -23,7 +23,7 @@ class ScriptingTest(unittest.TestCase):
       self.assertEqual(1, state[1])
       state[2] = state[2] + 1
 
-    self.builder.run()
+    self.builder.run(outdated=True)
 
     for state_element in state:
       self.assertEqual(1, state_element)

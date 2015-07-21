@@ -1,4 +1,5 @@
 import copy
+import multiprocessing
 import time
 import unittest
 
@@ -74,14 +75,14 @@ class RunnerTest(unittest.TestCase):
           task23
       ]
     )
-    runner.run_tracker(tracker, iter([
+    runner.run_tracker(tracker, [
         runner.Event(
             path_selector=lambda unused_tracker: [(1,)],
             flags=runner.EventFlags(
                 paths_state=runner.PathState.up_to_date
             )
         )
-    ]))
+    ], outdated=True)
     self.assertEqual(1, task12.ran_count)
     self.assertEqual(1, task23.ran_count)
     self.assertLessEqual(task12.run_time, task23.run_time)
@@ -96,17 +97,16 @@ class RunnerTest(unittest.TestCase):
           task23
       ]
     )
-    runner.run_tracker(tracker, iter([
+    runner.run_tracker(tracker, [
         runner.Event(
             path_selector=lambda unused_tracker: [(1,)],
             flags=runner.EventFlags(
                 paths_state=runner.PathState.up_to_date
             )
         )
-    ]), outdated=False)
+    ], outdated=False)
     self.assertEqual(0, task12.ran_count)
     self.assertEqual(0, task23.ran_count)
-
 
   def test_line_run_initializing_task(self):
     task0 = TestTask('0', [], [(1,)])
@@ -120,7 +120,7 @@ class RunnerTest(unittest.TestCase):
           task23
       ]
     )
-    runner.run_tracker(tracker, iter([]))
+    runner.run_tracker(tracker, [], outdated=True)
     self.assertEqual(1, task0.ran_count)
     self.assertEqual(1, task12.ran_count)
     self.assertEqual(1, task23.ran_count)
@@ -141,7 +141,7 @@ class RunnerTest(unittest.TestCase):
             task234
         ]
     )
-    runner.run_tracker(tracker, iter([]))
+    runner.run_tracker(tracker, [], outdated=True)
     self.assertEqual(1, task0.ran_count)
     self.assertEqual(1, task12.ran_count)
     self.assertEqual(1, task13.ran_count)
@@ -159,7 +159,7 @@ class RunnerTest(unittest.TestCase):
         ]
     )
     with self.assertRaises(runner.RunnerError):
-      runner.run_tracker(tracker, iter([]))
+      runner.run_tracker(tracker, [], outdated=True)
 
   def test_failure_keep_going(self):
     task2 = TestTask('2', [], [(2,)])
@@ -173,7 +173,7 @@ class RunnerTest(unittest.TestCase):
         ]
     )
     with self.assertRaises(runner.RunnerError):
-      runner.run_tracker(tracker, iter([]), keep_going=True)
+      runner.run_tracker(tracker, [], keep_going=True, outdated=True)
     self.assertEqual(1, task2.ran_count)
     self.assertEqual(1, task23.ran_count)
 

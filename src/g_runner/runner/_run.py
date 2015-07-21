@@ -45,38 +45,38 @@ class RunnerCallbacks(object):
   explicit locking from the runner, thus thread safety must be ensured by the
   callee."""
 
-  def on_task_running(self, task):
+  def on_task_running(self, tracker, task):
     """Called when a task enters the running state."""
     pass
 
-  def on_task_stopped(self, task):
+  def on_task_stopped(self, tracker, task):
     """Called when a task enters the stopped state."""
     pass
 
-  def on_task_failed(self, task):
+  def on_task_failed(self, tracker, task):
     """Called when a task failed.
 
     Note that this is a refinement of a task stopping; it is called in addition
     to on_task_stopped."""
     pass
 
-  def on_path_added(self, path):
+  def on_path_added(self, tracker, path):
     """Called when a path is added to the tracker."""
     pass
 
-  def on_path_outdated(self, path):
+  def on_path_outdated(self, tracker, path):
     """Called when a path enters the outdated state."""
     pass
 
-  def on_path_updating(self, path):
+  def on_path_updating(self, tracker, path):
     """Called when a path enters the updating state."""
     pass
 
-  def on_path_up_to_date(self, path):
+  def on_path_up_to_date(self, tracker, path):
     """Called when a path enters the up-to-date state."""
     pass
 
-  def on_event(self, event):
+  def on_event(self, tracker, event):
     """Called when the runner processes an event."""
     pass
 
@@ -133,13 +133,13 @@ class _TrackerRunner(object):
       self.tracker = self.tracker.replaced(new_paths=[path])
       self.paths_by_state[state].add(path)
       self.path_states[path] = state
-    self.callbacks.on_path_added(path)
+    self.callbacks.on_path_added(self.tracker, path)
     if state == _PathState.outdated:
-      self.callbacks.on_path_outdated(path)
+      self.callbacks.on_path_outdated(self.tracker, path)
     elif state == _PathState.updating:
-      self.callbacks.on_path_updating(path)
+      self.callbacks.on_path_updating(self.tracker, path)
     elif state == _PathState.up_to_date:
-      self.callbacks.on_path_up_to_date(path)
+      self.callbacks.on_path_up_to_date(self.tracker, path)
 
   def _remove_task(self, task):
     """Remove a task.
@@ -158,7 +158,7 @@ class _TrackerRunner(object):
 
   def _add_task(self, task):
     with self.lock:
-      self.tracker = self.tracker.replaced(new_tasks=[tasks])
+      self.tracker = self.tracker.replaced(new_tasks=[task])
       self.task_states[task] = _TaskState.stopped
       self.tasks_by_state[_TaskState.stopped].add(task)
 
@@ -168,11 +168,11 @@ class _TrackerRunner(object):
       self.path_states[path] = state
       self.paths_by_state[state].add(path)
     if state == _PathState.outdated:
-      self.callbacks.on_path_outdated(path)
+      self.callbacks.on_path_outdated(self.tracker, path)
     elif state == _PathState.updating:
-      self.callbacks.on_path_updating(path)
+      self.callbacks.on_path_updating(self.tracker, path)
     elif state == _PathState.up_to_date:
-      self.callbacks.on_path_up_to_date(path)
+      self.callbacks.on_path_up_to_date(self.tracker, path)
 
   def _set_task_state(self, task, state):
     with self.lock:
@@ -180,9 +180,9 @@ class _TrackerRunner(object):
       self.task_states[task] = state
       self.tasks_by_state[state].add(task)
     if state == _TaskState.stopped:
-      self.callbacks.on_task_stopped(task)
+      self.callbacks.on_task_stopped(self.tracker, task)
     elif state == _TaskState.running:
-      self.callbacks.on_task_running(task)
+      self.callbacks.on_task_running(self.tracker, task)
 
   def _replace_task_tags(self, task, tags):
     with self.lock:
@@ -199,49 +199,50 @@ class _TrackerRunner(object):
     Returns:
       A list of valid yet unhandled events. These should be passed back in to
       the function at a later point."""
-    for event in events:
-      self.callbacks.on_event(event)
-      if event.path_selector is not None:
-        paths = set(event.path_selector(self.tracker))
-        if event.path_regenerator is not None:
-          new_paths = set(event.path_regenerator(self.tracker, paths))
-          # replace paths with new_paths both in the tracker and in this scope
-          removed_paths = paths.difference(new_paths)
-          new_new_paths = new_paths.difference(paths)
-          for path in removed_paths:
-            self._remove_path(path)
-          for path in new_new_paths:
-            self._add_path(path, event.flags.paths_state)
-          paths = new_paths
-        # Note that we only allow transitions to the 'updated' from
-        # 'updating', in which case we consider the state transition as being
-        # from 'updating' to `up_to_date`, else it's a no-op.
-        if event.flags.paths_state == _PathState.updated:
-          for path in paths:
-            if self.path_states[path] == _PathState.updating:
-              self._set_path_state(path, _PathState.up_to_date)
-            else:
-              self._set_path_state(path, _PathState.outdated)
-        else:
-          for path in paths:
-            self._set_path_state(path, event.flags.paths_state)
-      if event.task_selector is not None:
-        tasks = set(event.task_selector(self.tracker))
-        if event.task_regenerator is not None:
-          new_tasks = set(event.task_regenerator(self.tracker, tasks))
-          removed_tasks = tasks.difference(new_tasks)
-          new_new_tasks = new_tasks.difference(tasks)
-          for task in removed_tasks:
-            self._remove_task(task)
-            if event.flags.removed_tasks_outdate_paths:
-              for path in task.output_paths():
+    with self.lock:
+      for event in events:
+        self.callbacks.on_event(self.tracker, event)
+        if event.path_selector is not None:
+          paths = set(event.path_selector(self.tracker))
+          if event.path_regenerator is not None:
+            new_paths = set(event.path_regenerator(self.tracker, paths))
+            # replace paths with new_paths both in the tracker and in this scope
+            removed_paths = paths.difference(new_paths)
+            new_new_paths = new_paths.difference(paths)
+            for path in removed_paths:
+              self._remove_path(path)
+            for path in new_new_paths:
+              self._add_path(path, event.flags.paths_state)
+            paths = new_paths
+          # Note that we only allow transitions to the 'updated' from
+          # 'updating', in which case we consider the state transition as being
+          # from 'updating' to `up_to_date`, else it's a no-op.
+          if event.flags.paths_state == _PathState.updated:
+            for path in paths:
+              if self.path_states[path] == _PathState.updating:
+                self._set_path_state(path, _PathState.up_to_date)
+              else:
                 self._set_path_state(path, _PathState.outdated)
-          for task in new_new_tasks:
-            self._add_task(task)
-          tasks = new_tasks
-        if event.tasks_tags is not None:
-          for task in tasks:
-            self._replace_task_tags(task, event.flags.tasks_tags)
+          else:
+            for path in paths:
+              self._set_path_state(path, event.flags.paths_state)
+        if event.task_selector is not None:
+          tasks = set(event.task_selector(self.tracker))
+          if event.task_regenerator is not None:
+            new_tasks = set(event.task_regenerator(self.tracker, tasks))
+            removed_tasks = tasks.difference(new_tasks)
+            new_new_tasks = new_tasks.difference(tasks)
+            for task in removed_tasks:
+              self._remove_task(task)
+              if event.flags.removed_tasks_outdate_paths:
+                for path in task.output_paths():
+                  self._set_path_state(path, _PathState.outdated)
+            for task in new_new_tasks:
+              self._add_task(task)
+            tasks = new_tasks
+          if event.flags.tasks_tags is not None:
+            for task in tasks:
+              self._replace_task_tags(task, event.flags.tasks_tags)
     return []
 
   def _run_task_handle_updated_event(self, task, event_deque):
@@ -252,7 +253,7 @@ class _TrackerRunner(object):
       task.run()
       successful = True
     except Exception as e:
-      self.callbacks.on_task_failed(task)
+      self.callbacks.on_task_failed(self.tracker, task)
       self.failures_deque.append(e)
     # the deque structure doesn't need locking! woo!
     if successful:
@@ -334,6 +335,13 @@ class _TrackerRunner(object):
     runner_event_poll_thread.start()
     runner_events = []
 
+    # Pump the queue's initial events
+    while True:
+      try:
+        runner_events.append(runner_event_deque.popleft())
+      except:
+        break
+
     while (runner_event_poll_thread.is_alive() or len(runner_events) > 0 or
            not self._up_to_date()):
       if len(self.failures_deque) > 0 and not self.keep_going:
@@ -355,8 +363,8 @@ class _TrackerRunner(object):
       raise RunnerError(self.failures_deque)
 
 
-def run_tracker(tracker, runner_event_iterator,
-                outdated=True, keep_going=False, callbacks=RunnerCallbacks()):
+def run_tracker(tracker, runner_event_iterator, outdated=False,
+                keep_going=False, callbacks=RunnerCallbacks()):
   tracker_runner = _TrackerRunner(
       tracker, outdated=outdated, keep_going=keep_going, callbacks=callbacks)
   return tracker_runner.run(runner_event_iterator)
