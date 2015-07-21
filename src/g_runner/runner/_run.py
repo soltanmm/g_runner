@@ -39,7 +39,7 @@ class _TaskState(object):
 
 
 class RunnerCallbacks(object):
-  """Callbacks during a run of tracked tasks.
+  """Edge-triggered callbacks during a run of tracked tasks.
 
   Useful for verbose output of the run state. Note that callbacks have no
   explicit locking from the runner, thus thread safety must be ensured by the
@@ -78,6 +78,13 @@ class RunnerCallbacks(object):
 
   def on_event(self, tracker, event):
     """Called when the runner processes an event."""
+    pass
+
+  def on_event_wait(self, tracker):
+    """Called when the only thing keeping the run from terminating is the open
+    event queue. Note that this may be spuriously called; it's up to the
+    callback-callee to determine whether or not there's something to do with
+    respect to the waiting runner."""
     pass
 
 def _run_tracker_poll_event_iterator(event_iterator, out_event_deque):
@@ -341,23 +348,35 @@ class _TrackerRunner(object):
         runner_events.append(runner_event_deque.popleft())
       except:
         break
+    all_up_to_date = self._up_to_date()
 
+    # There's no race condition here w.r.t. the poll thread and empty initial
+    # queues, because as long as the thread is alive, we'll run, and if the
+    # thread is dead, even if runner_events is empty, it will have filled
+    # runner_event_deque if there were any events to be processed.  Furthermore,
+    # the interpreter will evaluate the terms left to right, so the ordering of
+    # events is maintained.
     while (runner_event_poll_thread.is_alive() or len(runner_events) > 0 or
-           not self._up_to_date()):
+           len(runner_event_deque) > 0 or not all_up_to_date):
       if len(self.failures_deque) > 0 and not self.keep_going:
         raise RunnerError(self.failures_deque)
+      runner_events = self._handle_events(runner_events)
+      # Now run the tasks that we know affect targets that are out of date. We
+      # do not directly support multiple tasks producing the same path; that has
+      # to be handled a layer above us via user event generators (and really
+      # only for cycle-inducing tasks).
+      self._run_update(runner_event_deque)
+
       # Pump the queue
       while True:
         try:
           runner_events.append(runner_event_deque.popleft())
         except:
           break
-      runner_events = self._handle_events(runner_events)
-      # Now run the tasks that we know to affect targets that are out of date.
-      # We do not directly support multiple tasks producing the same path; that
-      # has to be handled a layer above us via user event generators (and really
-      # only for cycle-inducing tasks).
-      self._run_update(runner_event_deque)
+      all_up_to_date = self._up_to_date()
+      if (runner_event_poll_thread.is_alive() and all_up_to_date and
+          len(runner_events) == 0 and len(runner_event_deque) == 0):
+        self.callbacks.on_event_wait(self.tracker)
 
     if len(self.failures_deque) > 0:
       raise RunnerError(self.failures_deque)
