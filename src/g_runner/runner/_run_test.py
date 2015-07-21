@@ -97,16 +97,36 @@ class RunnerTest(unittest.TestCase):
           task23
       ]
     )
+    runner.run_tracker(tracker, [], outdated=False)
+    self.assertEqual(0, task12.ran_count)
+    self.assertEqual(0, task23.ran_count)
+
+  def test_line_run_remove_add_outdated(self):
+    task12 = TestTask('12', [(1,)], [(2,)])
+    task23 = TestTask('23', [(2,)], [(3,)])
+    tracker = _tracker.Tracker().replaced(
+      new_paths=[(1,), (2,), (3,)],
+      new_tasks=[
+          task12,
+          task23
+      ]
+    )
     runner.run_tracker(tracker, [
         runner.Event(
             path_selector=lambda unused_tracker: [(1,)],
+            path_regenerator=lambda unused_tracker, unused_paths: [],
+        ),
+        runner.Event(
+            path_selector=lambda unused_tracker: [],
+            path_regenerator=lambda unused_tracker, unused_paths: [(1,)],
             flags=runner.EventFlags(
                 paths_state=runner.PathState.up_to_date
             )
         )
-    ], outdated=False)
-    self.assertEqual(0, task12.ran_count)
-    self.assertEqual(0, task23.ran_count)
+    ], outdated=True)
+    self.assertEqual(1, task12.ran_count)
+    self.assertEqual(1, task23.ran_count)
+    self.assertLessEqual(task12.run_time, task23.run_time)
 
   def test_line_run_initializing_task(self):
     task0 = TestTask('0', [], [(1,)])

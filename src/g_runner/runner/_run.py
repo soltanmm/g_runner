@@ -136,10 +136,10 @@ class _TrackerRunner(object):
     self.callbacks.on_path_added(self.tracker, path)
     if state == _PathState.outdated:
       self.callbacks.on_path_outdated(self.tracker, path)
-    elif state == _PathState.updating:
-      self.callbacks.on_path_updating(self.tracker, path)
     elif state == _PathState.up_to_date:
       self.callbacks.on_path_up_to_date(self.tracker, path)
+    # note that there's no case where a path can be added in the 'updating'
+    # state.
 
   def _remove_task(self, task):
     """Remove a task.
@@ -216,7 +216,7 @@ class _TrackerRunner(object):
             paths = new_paths
           # Note that we only allow transitions to the 'updated' from
           # 'updating', in which case we consider the state transition as being
-          # from 'updating' to `up_to_date`, else it's a no-op.
+          # from 'updating' to `up_to_date`, else it's a reset to 'outdated'.
           if event.flags.paths_state == _PathState.updated:
             for path in paths:
               if self.path_states[path] == _PathState.updating:
