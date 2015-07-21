@@ -1,4 +1,7 @@
 build/
+cover/
 nose-*.egg/
+coverage-*.egg/
+.coverage
 *.pyo
 *.pyc

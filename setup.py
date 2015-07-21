@@ -11,6 +11,6 @@ setuptools.setup(
     author_email='',
     packages=setuptools.find_packages('src'),
     package_dir={'':'src'},
-    setup_requires=['nose>=1.0'],
+    setup_requires=['nose>=1.0', 'coverage>=4.0a0'],
     test_suite='nose.collector'
 )
