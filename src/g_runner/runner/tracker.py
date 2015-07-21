@@ -104,6 +104,7 @@ class Tracker(interfaces.Tracker):
 
   def replaced(self, old_paths=set(), new_paths=set(),
                old_tasks=set(), new_tasks=set(), new_tagged_tasks=dict()):
+    # TODO(atash) enable some manner of copy-on-write behavior?
     new_tracker = Tracker()
     new_tracker._paths = (
         self._paths.difference(set(old_paths)).union(set(new_paths)))
