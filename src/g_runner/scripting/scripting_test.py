@@ -7,7 +7,7 @@ class ScriptingTest(unittest.TestCase):
   def setUp(self):
     self.builder = scripting.TrackerBuilder()
 
-  def testScriptedRunByIdentifiers(self):
+  def test_scripted_run_by_identifiers(self):
     state = [0 for i in range(3)]
     @self.builder.task()
     def task0():

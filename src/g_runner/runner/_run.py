@@ -1,5 +1,4 @@
 import collections
-import contextlib
 import copy
 import itertools
 import os
@@ -90,8 +89,6 @@ class _TrackerRunner(object):
 
   def __init__(self, tracker, outdated=True, callbacks=RunnerCallbacks(),
                keep_going=False):
-    if not isinstance(tracker, interfaces.Tracker):
-      raise TypeError('expected `tracker` to be an `interfaces.Tracker`')
     if not isinstance(callbacks, RunnerCallbacks):
       raise TypeError('expected `callbacks` to be a `RunnerCallbacks`')
     self.tracker = _tracker.Tracker(tracker)
@@ -359,7 +356,7 @@ class _TrackerRunner(object):
 
 
 def run_tracker(tracker, runner_event_iterator,
-                outdated=True, keep_going=False):
+                outdated=True, keep_going=False, callbacks=RunnerCallbacks()):
   tracker_runner = _TrackerRunner(
-      tracker, outdated=outdated, keep_going=keep_going)
+      tracker, outdated=outdated, keep_going=keep_going, callbacks=callbacks)
   return tracker_runner.run(runner_event_iterator)
