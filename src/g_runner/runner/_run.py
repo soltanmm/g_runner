@@ -53,7 +53,7 @@ class RunnerCallbacks(object):
     """Called when a task enters the stopped state."""
     pass
 
-  def on_task_failed(self, tracker, task):
+  def on_task_failed(self, tracker, task, error):
     """Called when a task failed.
 
     Note that this is a refinement of a task stopping; it is called in addition
@@ -260,7 +260,7 @@ class _TrackerRunner(object):
       task.run()
       successful = True
     except Exception as e:
-      self.callbacks.on_task_failed(self.tracker, task)
+      self.callbacks.on_task_failed(self.tracker, task, e)
       self.failures_deque.append(e)
     # the deque structure doesn't need locking! woo!
     if successful:
