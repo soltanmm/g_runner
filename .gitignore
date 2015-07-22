@@ -2,6 +2,7 @@ build/
 cover/
 nose-*.egg/
 coverage-*.egg/
+Sphinx-*.egg/
 .coverage
 *.pyo
 *.pyc
