@@ -5,3 +5,4 @@ coverage-*.egg/
 .coverage
 *.pyo
 *.pyc
+nosetests.xml
